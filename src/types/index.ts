@@ -8,9 +8,18 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'USER' | 'ADMIN';
+  role: 'ADMIN' | 'USER';
+  status: 'active' | 'inactive';
+  lastLogin: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface DashboardStats {
+  totalUsers: number;
+  activeUsers: number;
+  newUsers: number;
+  userGrowth: string;
 }
 
 export interface AuthResponse {
@@ -18,8 +27,8 @@ export interface AuthResponse {
   user: User;
 }
 
-export interface ApiError {
+export interface AdminResponse<T = any> {
+  success: boolean;
+  data: T;
   message: string;
-  status: number;
-  errors?: Record<string, string>;
 }

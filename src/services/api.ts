@@ -1,67 +1,98 @@
-  import axios from 'axios';
-  import { UserCredentials, AuthResponse } from '../types';
+import axios from 'axios';
+import { 
+  UserCredentials, 
+  AuthResponse, 
+  User, 
+  DashboardStats, 
+  AdminResponse 
+} from '../types';
 
-  const api = axios.create({
-    baseURL: 'https://stockscope-production.up.railway.app/api', // Updated to use proxy
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+const api = axios.create({
+  baseURL: 'https://stockscope-production.up.railway.app/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
-  // Add request interceptor for JWT token
-  api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+// Request interceptor for JWT token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
     }
-    return config;
-  });
+    return Promise.reject(error);
+  }
+);
 
-  // Add response interceptor for error handling
-  api.interceptors.response.use(
-    (response) => response,
-    (error) => {
-      if (error.response?.status === 401) {
-        // Handle unauthorized access
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-      }
-      return Promise.reject(error);
-    }
-  );
+// Add export for authApi
+export const authApi = {
+  login: async (credentials: UserCredentials): Promise<AuthResponse> => {
+    const response = await api.post('/auth/login', credentials);
+    return response.data;
+  },
 
-  export const authApi = {
-    login: async (credentials: UserCredentials): Promise<AuthResponse> => {
-      try {
-        
-        
-        const response = await api.post('/auth/login', credentials);
-        return response.data;
-      } catch (error) {
-        console.error('Login error:', error);
-        throw error;
-      }
-    },
+  signup: async (credentials: UserCredentials): Promise<AuthResponse> => {
+    const response = await api.post('/auth/signup', credentials);
+    return response.data;
+  },
 
-    signup: async (credentials: UserCredentials): Promise<AuthResponse> => {
-      try {
-        const response = await api.post('/auth/signup', credentials);
-        return response.data;
-      } catch (error) {
-        console.error('Signup error:', error);
-        throw error;
-      }
-    },
+  logout: async (): Promise<void> => {
+    await api.post('/auth/logout');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  }
+};
 
-    logout: async (): Promise<void> => {
-      try {
-        await api.post('/auth/logout');
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      } catch (error) {
-        console.error('Logout error:', error);
-        throw error;
-      }
-    },
-  };
+export const adminApi = {
+  // Dashboard Stats
+  getDashboardStats: async (): Promise<DashboardStats> => {
+    const response = await api.get('/admin/dashboard/stats');
+    return response.data;
+  },
+
+  // Users
+  getUsers: async (): Promise<User[]> => {
+    const response = await api.get('/admin/users');
+    return response.data;
+  },
+
+  getUserById: async (userId: string): Promise<User> => {
+    const response = await api.get(`/admin/users/${userId}`);
+    return response.data;
+  },
+
+  createUser: async (userData: Omit<User, 'id'>): Promise<AdminResponse<User>> => {
+    const response = await api.post('/admin/users', userData);
+    return response.data;
+  },
+
+  updateUser: async (userId: string, userData: Partial<User>): Promise<AdminResponse<User>> => {
+    const response = await api.put(`/admin/users/${userId}`, userData);
+    return response.data;
+  },
+
+  deleteUser: async (userId: string): Promise<AdminResponse> => {
+    const response = await api.delete(`/admin/users/${userId}`);
+    return response.data;
+  },
+
+  // Analytics
+  getAnalytics: async () => {
+    const response = await api.get('/admin/analytics');
+    return response.data;
+  }
+};
+
+export default api;
