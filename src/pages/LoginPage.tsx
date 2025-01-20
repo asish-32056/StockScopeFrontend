@@ -22,7 +22,6 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Clear errors when input changes
   useEffect(() => {
     setErrors({ email: '', password: '' });
   }, [formData]);
@@ -50,32 +49,61 @@ const LoginPage: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value.trim(),
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     try {
       setIsLoading(true);
-      const response = await authApi.login(formData);
+      console.log('Attempting login with:', { email: formData.email });
+
+      const response = await authApi.login({
+        email: formData.email.trim(),
+        password: formData.password,
+      });
+
+      console.log('Login response received:', {
+        success: true,
+        role: response.user.role,
+      });
+
+      if (!response.token || !response.user) {
+        throw new Error('Invalid response from server');
+      }
+
       await login(response.token, response.user);
-      
-      toast.success('Successfully logged in!');
-      
-      // Navigate to the intended page or default dashboard
-      const from = (location.state as any)?.from?.pathname || 
+
+      const from = (location.state as any)?.from?.pathname ||
         (response.user.role === 'ADMIN' ? '/admin' : '/dashboard');
+
+      toast.success('Successfully logged in!');
       navigate(from, { replace: true });
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to login');
+      console.error('Login error:', {
+        status: error.response?.status,
+        message: error.response?.data?.message || error.message,
+      });
+
+      let errorMessage = 'Failed to login';
+
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message === 'Network Error') {
+        errorMessage = 'Unable to connect to server';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -135,11 +163,7 @@ const LoginPage: React.FC = () => {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
                 {errors.password && (
@@ -152,11 +176,7 @@ const LoginPage: React.FC = () => {
                 disabled={isLoading}
                 className="w-full flex justify-center py-2 px-4"
               >
-                {isLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  'Sign in'
-                )}
+                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Sign in'}
               </Button>
 
               <div className="mt-6">

@@ -7,6 +7,7 @@ import Settings from './pages/admin/Settings';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import UserDashboard from './pages/UserDashboard';
+import HomePage from './pages/HomePage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const App: React.FC = () => {
@@ -15,6 +16,7 @@ const App: React.FC = () => {
   return (
     <Routes>
       {/* Public Routes */}
+      <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
 
@@ -54,17 +56,8 @@ const App: React.FC = () => {
         }
       />
 
-      {/* Redirect root to appropriate dashboard */}
-      <Route
-        path="/"
-        element={
-          user ? (
-            <Navigate to={user.role === 'ADMIN' ? '/admin' : '/dashboard'} replace />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
+      {/* Catch-all route */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };

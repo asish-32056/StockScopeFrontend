@@ -1,4 +1,4 @@
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
 import { toast } from 'react-hot-toast';
 import { 
   UserCredentials, 
@@ -8,12 +8,25 @@ import {
   AdminResponse 
 } from '../types';
 
-const api = axios.create({
+// Create custom error class for API errors
+class APIError extends Error {
+  constructor(
+    message: string,
+    public status?: number,
+    public code?: string
+  ) {
+    super(message);
+    this.name = 'APIError';
+  }
+}
+
+const api: AxiosInstance = axios.create({
   baseURL: 'https://stockscope-production.up.railway.app/api',
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json'
   },
-  timeout: 15000, // 15 second timeout
+  timeout: 30000,
 });
 
 // Request interceptor
@@ -23,29 +36,80 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Debug logging in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('API Request:', {
+        url: config.url,
+        method: config.method,
+        headers: config.headers,
+        data: config.data
+      });
+    }
+    
     return config;
   },
   (error) => {
-    return Promise.reject(error);
+    console.error('Request Error:', error);
+    return Promise.reject(new APIError(error.message));
   }
 );
 
 // Response interceptor
 api.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      localStorage.clear();
-      window.location.href = '/login';
-      toast.error('Session expired. Please login again.');
-    } else if (!error.response) {
-      toast.error('Network error - please check your connection');
-    } else {
-      toast.error(
-        (error.response?.data as { message?: string })?.message || 'An unexpected error occurred'
-      );
+  (response: AxiosResponse) => {
+    // Debug logging in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('API Response:', {
+        status: response.status,
+        data: response.data
+      });
     }
-    return Promise.reject(error);
+    return response;
+  },
+  (error: AxiosError) => {
+    console.error('API Error:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
+
+    let errorMessage = 'An unexpected error occurred';
+    let errorStatus = error.response?.status;
+
+    if (error.response?.data && typeof error.response.data === 'object') {
+      const errorData = error.response.data as any;
+      errorMessage = errorData.message || errorMessage;
+    } else if (error.message === 'Network Error') {
+      errorMessage = 'Unable to connect to server';
+    }
+
+    // Handle specific status codes
+    switch (errorStatus) {
+      case 401:
+        localStorage.clear();
+        window.location.href = '/login';
+        errorMessage = 'Session expired. Please login again.';
+        break;
+      case 403:
+        errorMessage = 'Access denied';
+        break;
+      case 404:
+        errorMessage = 'Resource not found';
+        break;
+      case 422:
+        errorMessage = 'Invalid data provided';
+        break;
+      case 429:
+        errorMessage = 'Too many requests. Please try again later.';
+        break;
+      case 500:
+        errorMessage = 'Server error. Please try again later.';
+        break;
+    }
+
+    toast.error(errorMessage);
+    return Promise.reject(new APIError(errorMessage, errorStatus));
   }
 );
 
@@ -53,19 +117,25 @@ api.interceptors.response.use(
 export const authApi = {
   login: async (credentials: UserCredentials): Promise<AuthResponse> => {
     try {
-      const response = await api.post('/auth/login', credentials);
+      const response = await api.post<AuthResponse>('/auth/login', credentials);
       return response.data;
     } catch (error) {
-      throw error;
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError('Login failed');
     }
   },
 
   signup: async (userData: UserCredentials): Promise<AuthResponse> => {
     try {
-      const response = await api.post('/auth/signup', userData);
+      const response = await api.post<AuthResponse>('/auth/signup', userData);
       return response.data;
     } catch (error) {
-      throw error;
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError('Signup failed');
     }
   },
 
@@ -73,57 +143,80 @@ export const authApi = {
     try {
       await api.post('/auth/logout');
     } catch (error) {
-      throw error;
+      console.error('Logout error:', error);
+      // Continue with logout even if API call fails
+    }
+  },
+
+  verifyToken: async (): Promise<{ valid: boolean; user?: User }> => {
+    try {
+      const response = await api.get<AdminResponse<User>>('/auth/verify');
+      return { valid: true, user: response.data.data };
+    } catch (error) {
+      return { valid: false };
     }
   }
 };
 
 // Admin API endpoints
 export const adminApi = {
-  getDashboardStats: async (): Promise<DashboardStats> => {
+  getDashboardStats: async (): Promise<AdminResponse<DashboardStats>> => {
     try {
-      const response = await api.get('/admin/dashboard/stats');
+      const response = await api.get<AdminResponse<DashboardStats>>('/admin/dashboard/stats');
       return response.data;
     } catch (error) {
-      throw error;
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError('Failed to fetch dashboard stats');
     }
   },
 
-  getUsers: async (page = 1, limit = 10, search = ''): Promise<AdminResponse<User[]>> => {
+  getUsers: async (
+    page = 1, 
+    limit = 10, 
+    search = ''
+  ): Promise<AdminResponse<User[]>> => {
     try {
-      const response = await api.get('/admin/users', {
+      const response = await api.get<AdminResponse<User[]>>('/admin/users', {
         params: { page, limit, search }
       });
       return response.data;
     } catch (error) {
-      throw error;
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError('Failed to fetch users');
     }
   },
 
-  updateUser: async (userId: string, userData: Partial<User>): Promise<AdminResponse<User>> => {
+  updateUser: async (
+    userId: string, 
+    userData: Partial<User>
+  ): Promise<AdminResponse<User>> => {
     try {
-      const response = await api.put(`/admin/users/${userId}`, userData);
+      const response = await api.put<AdminResponse<User>>(
+        `/admin/users/${userId}`, 
+        userData
+      );
       return response.data;
     } catch (error) {
-      throw error;
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError('Failed to update user');
     }
   },
 
-  deleteUser: async (userId: string): Promise<AdminResponse> => {
+  deleteUser: async (userId: string): Promise<AdminResponse<void>> => {
     try {
-      const response = await api.delete(`/admin/users/${userId}`);
+      const response = await api.delete<AdminResponse<void>>(`/admin/users/${userId}`);
       return response.data;
     } catch (error) {
-      throw error;
-    }
-  },
-
-  getAnalytics: async () => {
-    try {
-      const response = await api.get('/admin/analytics');
-      return response.data;
-    } catch (error) {
-      throw error;
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError('Failed to delete user');
     }
   }
 };

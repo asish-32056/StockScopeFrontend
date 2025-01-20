@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { User } from '../types';
 import Loading from '../components/ui/loading';
 import { toast } from 'react-hot-toast';
+import { authApi } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
-  login: (token: string, userData: User) => void;
-  logout: () => void;
+  login: (token: string, userData: User) => Promise<void>;
+  logout: () => Promise<void>;
   isLoading: boolean;
   error: string | null;
 }
@@ -33,13 +34,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw new Error('Session expired');
           }
           
-          const userData = JSON.parse(storedUser);
-          setUser(userData);
+          // Verify token with backend
+          const { valid, user: verifiedUser } = await authApi.verifyToken();
+          if (!valid) {
+            throw new Error('Invalid session');
+          }
+          
+          setUser(verifiedUser || JSON.parse(storedUser));
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Auth initialization error:', error);
         localStorage.clear();
-        setError('Session expired. Please login again.');
+        setError(error.message || 'Session expired. Please login again.');
+        navigate('/login');
       } finally {
         setIsLoading(false);
       }
@@ -56,33 +63,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, 10000);
 
     return () => clearTimeout(loadingTimeout);
-  }, []);
+  }, [navigate]);
 
-  const login = (token: string, userData: User) => {
+  const login = async (token: string, userData: User) => {
     try {
+      // Validate token format
+      if (!token || typeof token !== 'string' || !token.includes('.')) {
+        throw new Error('Invalid token format');
+      }
+
+      // Validate user data
+      if (!userData || !userData.id || !userData.email || !userData.role) {
+        throw new Error('Invalid user data');
+      }
+
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
       setError(null);
-      navigate(userData.role === 'ADMIN' ? '/admin' : '/dashboard');
+
+      // Navigate based on role
+      const targetPath = userData.role === 'ADMIN' ? '/admin' : '/dashboard';
+      navigate(targetPath, { replace: true });
+      
       toast.success('Successfully logged in!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
       setError('Failed to process login');
-      toast.error('Login failed');
+      localStorage.clear();
+      toast.error(error.message || 'Login failed');
+      throw error;
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     try {
+      await authApi.logout();
+    } catch (error) {
+      console.error('Logout API error:', error);
+    } finally {
       localStorage.clear();
       setUser(null);
       setError(null);
-      navigate('/');
+      navigate('/login');
       toast.success('Successfully logged out');
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast.error('Logout failed');
     }
   };
 
@@ -91,8 +115,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading, error }}>
-      {error && <div className="error-toast">{error}</div>}
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      logout, 
+      isLoading, 
+      error 
+    }}>
       {children}
     </AuthContext.Provider>
   );
