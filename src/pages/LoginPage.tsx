@@ -1,149 +1,173 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { validateEmail } from '../lib/utils';
 import { authApi } from '../services/api';
-import { Briefcase } from 'lucide-react';
+import { Briefcase, Loader2, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
+  const [errors, setErrors] = useState({
+    email: '',
+    password: '',
+  });
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Clear errors when input changes
+  useEffect(() => {
+    setErrors({ email: '', password: '' });
+  }, [formData]);
+
+  const validateForm = (): boolean => {
+    let isValid = true;
+    const newErrors = { email: '', password: '' };
+
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+      isValid = false;
+    } else if (!validateEmail(formData.email)) {
+      newErrors.email = 'Please enter a valid email';
+      isValid = false;
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-
-    // Validate inputs
-    if (!email || !password) {
-      setError('All fields are required');
-      return;
-    }
-
-    if (!validateEmail(email)) {
-      setError('Please enter a valid email address');
+    
+    if (!validateForm()) {
       return;
     }
 
     try {
       setIsLoading(true);
-      const response = await authApi.login({ email, password });
-      login(response.token, response.user);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid email or password');
+      const response = await authApi.login(formData);
+      await login(response.token, response.user);
+      
+      toast.success('Successfully logged in!');
+      
+      // Navigate to the intended page or default dashboard
+      const from = (location.state as any)?.from?.pathname || 
+        (response.user.role === 'ADMIN' ? '/admin' : '/dashboard');
+      navigate(from, { replace: true });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to login');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-black to-gray-900 flex flex-col">
-      <div className="flex-1 flex flex-col justify-center px-6 py-12">
-        <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="flex justify-center">
-            <Briefcase className="h-12 w-12 text-indigo-400 animate-pulse" />
-          </div>
-          <h2 className="mt-6 text-center text-4xl font-extrabold text-indigo-200">
-            Welcome Back
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <Briefcase className="mx-auto h-12 w-12 text-indigo-400" />
+          <h2 className="mt-6 text-3xl font-extrabold text-white">
+            Sign in to your account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-400">
-            Sign in to your account and start exploring.
-          </p>
         </div>
 
-        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="bg-gray-800/70 py-10 px-8 shadow-xl rounded-lg backdrop-blur-md">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {error && (
-                <div className="bg-red-600/10 text-red-400 p-3 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
-
+        <div className="mt-8">
+          <div className="bg-gray-800 py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
+            <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-300">
-                  Email Address
+                <label htmlFor="email" className="block text-sm font-medium text-gray-200">
+                  Email address
                 </label>
                 <input
                   id="email"
+                  name="email"
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-2 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  disabled={isLoading}
+                  value={formData.email}
+                  onChange={handleChange}
+                  className={`mt-1 block w-full border ${
+                    errors.email ? 'border-red-500' : 'border-gray-700'
+                  } rounded-md shadow-sm py-2 px-3 bg-gray-700 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                  placeholder="Enter your email"
                 />
+                {errors.email && (
+                  <p className="mt-1 text-sm text-red-500">{errors.email}</p>
+                )}
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-300">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-200">
                   Password
                 </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-2 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
+                <div className="relative">
                   <input
-                    id="remember-me"
-                    name="remember-me"
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-2 focus:ring-indigo-500"
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={handleChange}
+                    className={`mt-1 block w-full border ${
+                      errors.password ? 'border-red-500' : 'border-gray-700'
+                    } rounded-md shadow-sm py-2 px-3 bg-gray-700 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                    placeholder="Enter your password"
                   />
-                  <label htmlFor="remember-me" className="ml-2 text-sm text-gray-300">
-                    Remember me
-                  </label>
-                </div>
-
-                <div className="text-sm">
-                  <Link
-                    to="/forgot-password"
-                    className="font-medium text-indigo-400 hover:underline"
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
                   >
-                    Forgot your password?
-                  </Link>
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
+                {errors.password && (
+                  <p className="mt-1 text-sm text-red-500">{errors.password}</p>
+                )}
               </div>
 
               <Button
                 type="submit"
-                className="w-full py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600 transition disabled:opacity-50"
                 disabled={isLoading}
+                className="w-full flex justify-center py-2 px-4"
               >
-                {isLoading ? 'Signing in...' : 'Sign in'}
+                {isLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  'Sign in'
+                )}
               </Button>
-            </form>
-
-            <div className="mt-8">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-600" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-gray-800 text-gray-400">
-                    Don’t have an account?
-                  </span>
-                </div>
-              </div>
 
               <div className="mt-6">
                 <Link
                   to="/signup"
-                  className="w-full flex justify-center text-sm text-indigo-400 hover:underline"
+                  className="w-full flex justify-center text-sm text-indigo-400 hover:text-indigo-300"
                 >
                   Create an account
                 </Link>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       </div>

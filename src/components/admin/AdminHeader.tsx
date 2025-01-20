@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { 
   Bell, 
@@ -12,6 +12,18 @@ import { Button } from '../ui/button';
 export const AdminHeader: React.FC = () => {
   const { user, logout } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <header className="bg-white border-b border-gray-200">
@@ -27,7 +39,7 @@ export const AdminHeader: React.FC = () => {
               <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full" />
             </Button>
 
-            <div className="relative">
+            <div className="relative" ref={dropdownRef}>
               <Button
                 variant="ghost"
                 className="flex items-center gap-2"
@@ -39,17 +51,17 @@ export const AdminHeader: React.FC = () => {
               </Button>
 
               {isProfileOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200">
                   <Button
                     variant="ghost"
-                    className="w-full justify-start px-4 py-2 text-sm"
+                    className="w-full justify-start px-4 py-2 text-sm hover:bg-gray-100"
                   >
                     <Settings className="h-4 w-4 mr-2" />
                     Settings
                   </Button>
                   <Button
                     variant="ghost"
-                    className="w-full justify-start px-4 py-2 text-sm text-red-600"
+                    className="w-full justify-start px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                     onClick={logout}
                   >
                     <LogOut className="h-4 w-4 mr-2" />

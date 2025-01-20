@@ -1,4 +1,5 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
+import { toast } from 'react-hot-toast';
 import { 
   UserCredentials, 
   AuthResponse, 
@@ -12,86 +13,118 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 15000, // 15 second timeout
 });
 
-// Request interceptor for JWT token
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// Request interceptor
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
-// Response interceptor for error handling
+// Response interceptor
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error: AxiosError) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      localStorage.clear();
       window.location.href = '/login';
+      toast.error('Session expired. Please login again.');
+    } else if (!error.response) {
+      toast.error('Network error - please check your connection');
+    } else {
+      toast.error(
+        (error.response?.data as { message?: string })?.message || 'An unexpected error occurred'
+      );
     }
     return Promise.reject(error);
   }
 );
 
-// Add export for authApi
+// Auth API endpoints
 export const authApi = {
   login: async (credentials: UserCredentials): Promise<AuthResponse> => {
-    const response = await api.post('/auth/login', credentials);
-    return response.data;
+    try {
+      const response = await api.post('/auth/login', credentials);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
-  signup: async (credentials: UserCredentials): Promise<AuthResponse> => {
-    const response = await api.post('/auth/signup', credentials);
-    return response.data;
+  signup: async (userData: UserCredentials): Promise<AuthResponse> => {
+    try {
+      const response = await api.post('/auth/signup', userData);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
   logout: async (): Promise<void> => {
-    await api.post('/auth/logout');
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    try {
+      await api.post('/auth/logout');
+    } catch (error) {
+      throw error;
+    }
   }
 };
 
+// Admin API endpoints
 export const adminApi = {
-  // Dashboard Stats
   getDashboardStats: async (): Promise<DashboardStats> => {
-    const response = await api.get('/admin/dashboard/stats');
-    return response.data;
+    try {
+      const response = await api.get('/admin/dashboard/stats');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
-  // Users
-  getUsers: async (): Promise<User[]> => {
-    const response = await api.get('/admin/users');
-    return response.data;
-  },
-
-  getUserById: async (userId: string): Promise<User> => {
-    const response = await api.get(`/admin/users/${userId}`);
-    return response.data;
-  },
-
-  createUser: async (userData: Omit<User, 'id'>): Promise<AdminResponse<User>> => {
-    const response = await api.post('/admin/users', userData);
-    return response.data;
+  getUsers: async (page = 1, limit = 10, search = ''): Promise<AdminResponse<User[]>> => {
+    try {
+      const response = await api.get('/admin/users', {
+        params: { page, limit, search }
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
   updateUser: async (userId: string, userData: Partial<User>): Promise<AdminResponse<User>> => {
-    const response = await api.put(`/admin/users/${userId}`, userData);
-    return response.data;
+    try {
+      const response = await api.put(`/admin/users/${userId}`, userData);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
   deleteUser: async (userId: string): Promise<AdminResponse> => {
-    const response = await api.delete(`/admin/users/${userId}`);
-    return response.data;
+    try {
+      const response = await api.delete(`/admin/users/${userId}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
-  // Analytics
   getAnalytics: async () => {
-    const response = await api.get('/admin/analytics');
-    return response.data;
+    try {
+      const response = await api.get('/admin/analytics');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   }
 };
 
