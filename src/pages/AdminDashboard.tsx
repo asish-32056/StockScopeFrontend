@@ -38,7 +38,7 @@ const AdminDashboard: React.FC = () => {
 
       setData({
         users: usersResponse.data,
-        stats: statsResponse
+        stats: statsResponse.data
       });
 
       if (!showLoadingState) {
