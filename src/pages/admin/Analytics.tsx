@@ -1,56 +1,33 @@
 import React, { useState, useEffect } from 'react';
+import { Card } from '../../components/ui/card';
 import { adminApi } from '../../services/api';
-import { useErrorHandler } from '../../components/hooks/userErrorHandler';
+import { DashboardStats } from '../../types';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { toast } from 'react-hot-toast';
-import { Button } from '../../components/ui/button';
-import { Loader2, Users, Activity, TrendingUp, BarChart2 } from 'lucide-react';
-
-interface AnalyticsData {
-  userStats: {
-    total: number;
-    active: number;
-    new: number;
-    growth: number;
-  };
-  activityStats: {
-    date: string;
-    logins: number;
-    actions: number;
-  }[];
-}
+import { Loader2 } from 'lucide-react';
 
 const Analytics: React.FC = () => {
-  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month'>('week');
-  const handleError = useErrorHandler();
-
-  const fetchAnalytics = async (showLoadingState = true) => {
-    try {
-      if (showLoadingState) {
-        setIsLoading(true);
-      } else {
-        setIsRefreshing(true);
-      }
-
-      const response = await adminApi.getAnalytics();
-      setData(response);
-
-      if (!showLoadingState) {
-        toast.success('Analytics data refreshed');
-      }
-    } catch (error) {
-      handleError(error);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
 
   useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        setIsLoading(true);
+        const response = await adminApi.getDashboardStats();
+        if (response.success) {
+          setStats(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching analytics:', error);
+        toast.error('Failed to load analytics data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     fetchAnalytics();
-  }, [timeRange]);
+  }, []);
 
   if (isLoading) {
     return (
@@ -60,106 +37,88 @@ const Analytics: React.FC = () => {
     );
   }
 
+  if (!stats) {
+    return (
+      <div className="p-6">
+        <Card className="p-6">
+          <p className="text-gray-500">No analytics data available</p>
+        </Card>
+      </div>
+    );
+  }
+
+  const chartData = [
+    {
+      name: 'Current Period',
+      total: stats.totalUsers,
+      active: stats.activeUsers,
+      new: stats.newUsers,
+    }
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-          <div className="flex items-center space-x-4">
-            <div className="flex rounded-md shadow-sm">
-              {(['day', 'week', 'month'] as const).map((range) => (
-                <Button
-                  key={range}
-                  onClick={() => setTimeRange(range)}
-                  variant={timeRange === range ? 'default' : 'outline'}
-                  className="capitalize"
-                >
-                  {range}
-                </Button>
-              ))}
-            </div>
-            <Button
-              onClick={() => fetchAnalytics(false)}
-              disabled={isRefreshing}
-              className="inline-flex items-center"
-            >
-              {isRefreshing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Refreshing...
-                </>
-              ) : (
-                'Refresh Data'
-              )}
-            </Button>
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-6">Analytics Overview</h1>
+      
+      <div className="grid grid-cols-1 gap-6">
+        <Card className="p-6">
+          <h2 className="text-lg font-medium mb-4">User Statistics</h2>
+          <div className="w-full h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={chartData}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="total" 
+                  stroke="#8884d8" 
+                  name="Total Users"
+                  strokeWidth={2}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="active" 
+                  stroke="#82ca9d" 
+                  name="Active Users"
+                  strokeWidth={2}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="new" 
+                  stroke="#ffc658" 
+                  name="New Users"
+                  strokeWidth={2}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
-        </div>
+        </Card>
 
-        {data && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Total Users</p>
-                    <p className="mt-1 text-3xl font-semibold text-gray-900">
-                      {data.userStats.total}
-                    </p>
-                  </div>
-                  <Users className="h-8 w-8 text-indigo-500" />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Active Users</p>
-                    <p className="mt-1 text-3xl font-semibold text-gray-900">
-                      {data.userStats.active}
-                    </p>
-                  </div>
-                  <Activity className="h-8 w-8 text-green-500" />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">New Users</p>
-                    <p className="mt-1 text-3xl font-semibold text-gray-900">
-                      {data.userStats.new}
-                    </p>
-                    <p className={`text-sm ${
-                      data.userStats.growth >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {data.userStats.growth >= 0 ? '↑' : '↓'} {Math.abs(data.userStats.growth)}%
-                    </p>
-                  </div>
-                  <TrendingUp className="h-8 w-8 text-blue-500" />
-                </div>
-              </div>
+        <Card className="p-6">
+          <h2 className="text-lg font-medium mb-4">Growth Metrics</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-gray-500">User Growth Rate</p>
+              <p className={`text-2xl font-bold ${
+                parseFloat(stats.userGrowth) >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {parseFloat(stats.userGrowth) >= 0 ? '↑' : '↓'} {Math.abs(parseFloat(stats.userGrowth))}%
+              </p>
             </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Activity Overview</h2>
-              <div className="space-y-4">
-                {data.activityStats.map((stat, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">{stat.date}</span>
-                    <div className="flex items-center space-x-6">
-                      <span className="text-sm">
-                        {stat.logins} logins
-                      </span>
-                      <span className="text-sm">
-                        {stat.actions} actions
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div>
+              <p className="text-sm text-gray-500">Active User Rate</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {((stats.activeUsers / stats.totalUsers) * 100).toFixed(1)}%
+              </p>
             </div>
           </div>
-        )}
+        </Card>
       </div>
     </div>
   );

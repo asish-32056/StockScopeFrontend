@@ -1,20 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { adminApi } from '../services/api';
-import { User } from '../types';
+import { User, DashboardStats, AdminResponse } from '../types';
 import { UserTable } from '../components/admin/UserTable';
 import { useErrorHandler } from '../components/hooks/userErrorHandler';
 import { toast } from 'react-hot-toast';
 import { Loader2, Users, TrendingUp, Activity } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
 
 interface DashboardData {
   users: User[];
-  stats: {
-    totalUsers: number;
-    activeUsers: number;
-    newUsers: number;
-    userGrowth: string;
-  };
+  stats: DashboardStats;
 }
 
 const AdminDashboard: React.FC = () => {
@@ -36,13 +32,15 @@ const AdminDashboard: React.FC = () => {
         adminApi.getDashboardStats()
       ]);
 
-      setData({
-        users: usersResponse.data,
-        stats: statsResponse.data
-      });
+      if (usersResponse.success && statsResponse.success) {
+        setData({
+          users: usersResponse.data,
+          stats: statsResponse.data
+        });
 
-      if (!showLoadingState) {
-        toast.success('Dashboard data refreshed');
+        if (!showLoadingState) {
+          toast.success('Dashboard data refreshed');
+        }
       }
     } catch (error) {
       handleError(error);
@@ -56,15 +54,17 @@ const AdminDashboard: React.FC = () => {
     fetchDashboardData();
     const interval = setInterval(() => {
       fetchDashboardData(false);
-    }, 5 * 60 * 1000);
+    }, 5 * 60 * 1000); // Refresh every 5 minutes
     return () => clearInterval(interval);
   }, []);
 
   const handleEditUser = async (user: User) => {
     try {
-      await adminApi.updateUser(user.id, user);
-      await fetchDashboardData(false);
-      toast.success('User updated successfully');
+      const response = await adminApi.updateUser(user.id, user);
+      if (response.success) {
+        await fetchDashboardData(false);
+        toast.success('User updated successfully');
+      }
     } catch (error) {
       handleError(error);
     }
@@ -75,9 +75,11 @@ const AdminDashboard: React.FC = () => {
       return;
     }
     try {
-      await adminApi.deleteUser(userId);
-      await fetchDashboardData(false);
-      toast.success('User deleted successfully');
+      const response = await adminApi.deleteUser(userId);
+      if (response.success) {
+        await fetchDashboardData(false);
+        toast.success('User deleted successfully');
+      }
     } catch (error) {
       handleError(error);
     }
@@ -115,7 +117,7 @@ const AdminDashboard: React.FC = () => {
         {data && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-white rounded-lg shadow p-6">
+              <Card className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Total Users</p>
@@ -125,9 +127,9 @@ const AdminDashboard: React.FC = () => {
                   </div>
                   <Users className="h-8 w-8 text-indigo-500" />
                 </div>
-              </div>
+              </Card>
 
-              <div className="bg-white rounded-lg shadow p-6">
+              <Card className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Active Users</p>
@@ -137,9 +139,9 @@ const AdminDashboard: React.FC = () => {
                   </div>
                   <Activity className="h-8 w-8 text-green-500" />
                 </div>
-              </div>
+              </Card>
 
-              <div className="bg-white rounded-lg shadow p-6">
+              <Card className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">New Users</p>
@@ -154,10 +156,10 @@ const AdminDashboard: React.FC = () => {
                   </div>
                   <TrendingUp className="h-8 w-8 text-blue-500" />
                 </div>
-              </div>
+              </Card>
             </div>
 
-            <div className="bg-white rounded-lg shadow">
+            <Card>
               <div className="p-6">
                 <h2 className="text-lg font-medium text-gray-900 mb-4">User Management</h2>
                 <UserTable
@@ -166,7 +168,7 @@ const AdminDashboard: React.FC = () => {
                   onDelete={handleDeleteUser}
                 />
               </div>
-            </div>
+            </Card>
           </>
         )}
       </div>
