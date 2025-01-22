@@ -7,6 +7,8 @@ import { toast } from 'react-hot-toast';
 import { Loader2, Users, TrendingUp, Activity } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
+import { useToast } from '../context/ToastContext';
+import Loading from '../components/ui/loading';
 
 interface DashboardData {
   users: User[];
@@ -18,6 +20,7 @@ const AdminDashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const handleError = useErrorHandler();
+  const { showToast } = useToast();
 
   const fetchDashboardData = async (showLoadingState = true) => {
     try {
@@ -85,13 +88,7 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-      </div>
-    );
-  }
+  if (isLoading || !data) return <Loading />;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -114,63 +111,59 @@ const AdminDashboard: React.FC = () => {
           </Button>
         </div>
 
-        {data && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <Card className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Total Users</p>
-                    <p className="mt-1 text-3xl font-semibold text-gray-900">
-                      {data.stats.totalUsers}
-                    </p>
-                  </div>
-                  <Users className="h-8 w-8 text-indigo-500" />
-                </div>
-              </Card>
-
-              <Card className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Active Users</p>
-                    <p className="mt-1 text-3xl font-semibold text-gray-900">
-                      {data.stats.activeUsers}
-                    </p>
-                  </div>
-                  <Activity className="h-8 w-8 text-green-500" />
-                </div>
-              </Card>
-
-              <Card className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">New Users</p>
-                    <p className="mt-1 text-3xl font-semibold text-gray-900">
-                      {data.stats.newUsers}
-                    </p>
-                    <p className={`text-sm ${
-                      parseFloat(data.stats.userGrowth) >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {parseFloat(data.stats.userGrowth) >= 0 ? '↑' : '↓'} {Math.abs(parseFloat(data.stats.userGrowth))}%
-                    </p>
-                  </div>
-                  <TrendingUp className="h-8 w-8 text-blue-500" />
-                </div>
-              </Card>
-            </div>
-
-            <Card>
-              <div className="p-6">
-                <h2 className="text-lg font-medium text-gray-900 mb-4">User Management</h2>
-                <UserTable
-                  users={data.users}
-                  onEdit={handleEditUser}
-                  onDelete={handleDeleteUser}
-                />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Users</p>
+                <p className="mt-1 text-3xl font-semibold text-gray-900">
+                  {data.stats.userStats.totalUsers}
+                </p>
               </div>
-            </Card>
-          </>
-        )}
+              <Users className="h-8 w-8 text-indigo-500" />
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Active Users</p>
+                <p className="mt-1 text-3xl font-semibold text-gray-900">
+                  {data.stats.userStats.activeUsers}
+                </p>
+              </div>
+              <Activity className="h-8 w-8 text-green-500" />
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">New Users</p>
+                <p className="mt-1 text-3xl font-semibold text-gray-900">
+                  {data.stats.userStats.newUsers}
+                </p>
+                <p className={`text-sm ${
+                  parseFloat(data.stats.userStats.userGrowth) >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {parseFloat(data.stats.userStats.userGrowth) >= 0 ? '↑' : '↓'} {Math.abs(parseFloat(data.stats.userStats.userGrowth))}%
+                </p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-blue-500" />
+            </div>
+          </Card>
+        </div>
+
+        <Card>
+          <div className="p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">User Management</h2>
+            <UserTable
+              users={data.users}
+              onEdit={handleEditUser}
+              onDelete={handleDeleteUser}
+            />
+          </div>
+        </Card>
       </div>
     </div>
   );

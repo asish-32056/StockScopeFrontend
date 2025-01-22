@@ -161,15 +161,8 @@ export const authApi = {
 // Admin API endpoints
 export const adminApi = {
   getDashboardStats: async (): Promise<AdminResponse<DashboardStats>> => {
-    try {
-      const response = await api.get<AdminResponse<DashboardStats>>('/admin/dashboard/stats');
-      return response.data;
-    } catch (error) {
-      if (error instanceof APIError) {
-        throw error;
-      }
-      throw new APIError('Failed to fetch dashboard stats');
-    }
+    const response = await api.get<AdminResponse<DashboardStats>>('/admin/dashboard/stats');
+    return response.data;
   },
 
   getUsers: async (
@@ -177,47 +170,26 @@ export const adminApi = {
     limit = 10, 
     search = ''
   ): Promise<AdminResponse<User[]>> => {
-    try {
-      const response = await api.get<AdminResponse<User[]>>('/admin/users', {
-        params: { page, limit, search }
-      });
-      return response.data;
-    } catch (error) {
-      if (error instanceof APIError) {
-        throw error;
-      }
-      throw new APIError('Failed to fetch users');
-    }
+    const response = await api.get<AdminResponse<User[]>>('/admin/users', {
+      params: { page, limit, search }
+    });
+    return response.data;
   },
 
   updateUser: async (
     userId: string, 
     userData: Partial<User>
   ): Promise<AdminResponse<User>> => {
-    try {
-      const response = await api.put<AdminResponse<User>>(
-        `/admin/users/${userId}`, 
-        userData
-      );
-      return response.data;
-    } catch (error) {
-      if (error instanceof APIError) {
-        throw error;
-      }
-      throw new APIError('Failed to update user');
-    }
+    const response = await api.put<AdminResponse<User>>(
+      `/admin/users/${userId}`, 
+      userData
+    );
+    return response.data;
   },
 
   deleteUser: async (userId: string): Promise<AdminResponse<void>> => {
-    try {
-      const response = await api.delete<AdminResponse<void>>(`/admin/users/${userId}`);
-      return response.data;
-    } catch (error) {
-      if (error instanceof APIError) {
-        throw error;
-      }
-      throw new APIError('Failed to delete user');
-    }
+    const response = await api.delete<AdminResponse<void>>(`/admin/users/${userId}`);
+    return response.data;
   }
 };
 
